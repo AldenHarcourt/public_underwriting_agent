@@ -36,6 +36,12 @@ except:
     import os
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
+# Initialize OpenAI client
+if OPENAI_API_KEY:
+    openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
+else:
+    openai_client = None
+
 # --- Constants ---
 MINIMUM_COMPS = 3
 RESIDENTIAL_PROPERTY_TYPES = ['singleFamily', 'multiFamily', 'condo', 'townhome', 'apartment', 'manufactured']
@@ -942,7 +948,10 @@ def get_image_description(image_urls, property_info):
     for url in valid_image_urls[:10]:
         content_payload.append({"type": "image_url", "image_url": {"url": url}})
     try:
-        response = openai.chat.completions.create(
+        if not openai_client:
+            return "OpenAI API key not configured"
+        
+        response = openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": content_payload}],
             max_tokens=250,
@@ -1060,7 +1069,10 @@ def get_structured_adjustments(subject_property, comps_df, subject_property_sour
         return {'adjustments': adjustment_map, 'arv_summary': '[OpenAI disabled - ARV calculated using weighted average of adjusted comparable prices with non-linear regression for square footage adjustments]'}
 
     try:
-        response = openai.chat.completions.create(
+        if not openai_client:
+            return {'adjustments': {}, 'arv_summary': 'OpenAI API key not configured - using basic valuation'}
+        
+        response = openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": system_prompt},
