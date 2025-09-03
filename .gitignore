@@ -1,0 +1,65 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Streamlit secrets (NEVER commit API keys)
+.streamlit/secrets.toml
+**/secrets.toml
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.staging
+
+# API Keys and sensitive configs
+*api_key*
+*secret*
+*password*
+
+# Local database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Debug and test files
+debug_*.py
+test_*.py
+simple_*.py
+*_debug.py
+*_test.py
+
+# Screenshots and temp files
+screenshots/
+*.tmp
+*.temp
+
+# CSV data files (may contain sensitive info)
+*.csv
+!*sample*.csv
+!*template*.csv
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude
+.claude/
