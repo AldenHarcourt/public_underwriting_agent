@@ -897,6 +897,20 @@ Final ARV: ${run_arv:,.2f}
         first_run_comps = all_run_details[0]['comps']
         summary_report += generate_comparable_summary_table(first_run_comps)
         
+        # Add detailed AI adjustment explanations for each comp
+        summary_report += "\n\n--- AI Adjustment Details ---\n"
+        for _, comp in first_run_comps.iterrows():
+            addr = comp.get('streetAddress', 'N/A')
+            ai_adj = comp.get('ai_adjustment', 0)
+            ai_weight = comp.get('ai_weight', 0)
+            ai_explanation = comp.get('ai_explanation', 'No explanation available')
+            
+            adj_sign = "+" if ai_adj >= 0 else ""
+            summary_report += f"\n{addr}:\n"
+            summary_report += f"  • AI Adjustment: {adj_sign}${ai_adj:,}\n"
+            summary_report += f"  • AI Weight: {ai_weight:.3f}\n"
+            summary_report += f"  • Explanation: {ai_explanation}\n"
+        
         # Combine all runs' comps data for final_comps_df
         combined_comps_df = pd.concat(all_comps_with_runs, ignore_index=True) if all_comps_with_runs else valid_comps
         
