@@ -63,3 +63,6 @@ Thumbs.db
 
 # Claude
 .claude/
+
+#raw data file
+washington_cleaned_data.csv
