@@ -1091,7 +1091,8 @@ def get_structured_adjustments(subject_property, comps_df, subject_property_sour
         "• When 'No valid images provided', rely on quantitative factors only\n\n"
         "WEIGHTING CRITERIA:\n"
         "• Higher weight: Recent sales, closer distance, similar bed/bath/age, better condition data\n"
-        "• Lower weight: Older sales, distant location, significant size differences, missing information\n\n"
+        "• Lower weight: Older sales, distant location, significant size differences, missing information\n"
+        "• IMPORTANT: Ensure all weights sum to 1.0 (will be normalized if they don't)\n\n"
         "OUTPUT REQUIREMENTS:\n"
         "Return ONLY a JSON object in this exact format (no other text):\n"
         "{\n"
@@ -1150,6 +1151,17 @@ def get_structured_adjustments(subject_property, comps_df, subject_property_sour
                     cleaned_content = code_match.group(1)
             
             result = json.loads(cleaned_content)
+            
+            # Normalize weights to sum to 1.0 for professional standards
+            if 'adjustments' in result:
+                weights = [adj.get('weight', 0) for adj in result['adjustments'].values()]
+                weight_sum = sum(weights)
+                if weight_sum > 0:
+                    # Normalize weights
+                    for addr, adj_data in result['adjustments'].items():
+                        current_weight = adj_data.get('weight', 0)
+                        result['adjustments'][addr]['weight'] = current_weight / weight_sum
+            
             # Handle both old format (just adjustments) and new format (adjustments + arv_summary)
             if 'adjustments' in result and 'arv_summary' in result:
                 return result
