@@ -1061,7 +1061,9 @@ def get_structured_adjustments(subject_property, comps_df, subject_property_sour
     system_prompt = (
         "You are a senior real estate underwriter with MAI certification and 20+ years of commercial and residential valuation experience. "
         "You specialize in comparative market analysis and property adjustments. "
-        "Provide professional underwriting analysis in strict JSON format only. No explanations or markdown."
+        "CRITICAL: Respond with ONLY valid JSON. Do not include any text before or after the JSON. "
+        "Do not use markdown formatting, code blocks, or any explanatory text. "
+        "Start your response with { and end with }."
     )
     if subject_property_source == "api":
         subject_context = "The subject property information below was retrieved from a trusted real estate API and should be considered the ground truth for comparison."
@@ -1091,7 +1093,14 @@ def get_structured_adjustments(subject_property, comps_df, subject_property_sour
         "• Higher weight: Recent sales, closer distance, similar bed/bath/age, better condition data\n"
         "• Lower weight: Older sales, distant location, significant size differences, missing information\n\n"
         "OUTPUT REQUIREMENTS:\n"
-        "Return JSON with keys: 'adjustments' (comp address -> {adjustment, explanation, weight}) and 'arv_summary' (methodology explanation)\n\n"
+        "Return ONLY a JSON object in this exact format (no other text):\n"
+        "{\n"
+        '  "adjustments": {\n'
+        '    "4870 NE 39th Street": {"adjustment": -25000, "explanation": "reason here", "weight": 0.85},\n'
+        '    "4832 NE 41st Street": {"adjustment": 15000, "explanation": "reason here", "weight": 0.75}\n'
+        "  },\n"
+        '  "arv_summary": "explanation of methodology and key factors"\n'
+        "}\n\n"
         "PROPERTY DATA:\n"
         f"Subject Property:\n{subject_info_str}\n\n"
         f"Comparable Properties:\n" + "\n".join([f"{i+1}. {comp}" for i, comp in enumerate(comp_info_list)])
@@ -1125,15 +1134,33 @@ def get_structured_adjustments(subject_property, comps_df, subject_property_sour
             content = ""
         
         try:
-            result = json.loads(content)
+            # Try to clean the content first - remove markdown code blocks if present
+            cleaned_content = content
+            if "```json" in content:
+                # Extract JSON from markdown code block
+                import re
+                json_match = re.search(r'```json\s*(\{.*?\})\s*```', content, re.DOTALL)
+                if json_match:
+                    cleaned_content = json_match.group(1)
+            elif "```" in content:
+                # Extract content between any code blocks
+                import re
+                code_match = re.search(r'```[^`]*(\{.*?\})[^`]*```', content, re.DOTALL)
+                if code_match:
+                    cleaned_content = code_match.group(1)
+            
+            result = json.loads(cleaned_content)
             # Handle both old format (just adjustments) and new format (adjustments + arv_summary)
             if 'adjustments' in result and 'arv_summary' in result:
                 return result
             else:
                 # Old format - wrap in new structure
                 return {'adjustments': result, 'arv_summary': 'ARV calculated using weighted average of adjusted comparable prices with non-linear regression for square footage adjustments.'}
-        except Exception:
-            # Fallback if JSON parsing fails
+        except Exception as e:
+            # Fallback if JSON parsing fails - log what we actually got for debugging
+            print(f"DEBUG: JSON parsing failed. Raw AI response: {content[:200]}...")
+            print(f"DEBUG: JSON parsing error: {str(e)}")
+            
             adjustment_map = {}
             for _, comp in comps_df.iterrows():
                 addr = comp.get('streetAddress', comp.get('street_address', 'N/A'))
