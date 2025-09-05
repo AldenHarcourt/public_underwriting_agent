@@ -951,10 +951,16 @@ def get_image_description(image_urls, property_info):
         return "No valid images provided for analysis."
 
     prompt_text = (
-        "You are a seasoned real estate underwriter. Analyze the following property photos and produce ONE paragraph "
-        "describing the level of finish, quality of appliances and fixtures, natural lighting, visible repairs or renovations needed, overall condition, and any other non-sqft based underwriting analysis necessary. "
-        "Do NOT comment on staging or furniture.\n\n"
-        f"Property: {property_info}"
+        "You are a professional real estate underwriter with 15+ years of experience in property valuation. "
+        "Analyze these property photos from an underwriting perspective, focusing on factors that impact market value. "
+        "Provide a concise professional assessment in 2-3 sentences covering: "
+        "\n• CONDITION: Overall maintenance, visible defects, and repair needs that affect value "
+        "\n• QUALITY: Architectural style, materials, craftsmanship, and finish level relative to market standards "
+        "\n• MARKETABILITY: Curb appeal, design features, and elements that influence buyer desirability "
+        "\nFocus only on permanent property features that impact valuation. "
+        "Do NOT comment on furnishings, staging, or personal items. "
+        "Be objective and use professional real estate terminology.\n\n"
+        f"Property Details: {property_info}"
     )
     # Build content_payload as a list of message parts for OpenAI vision API
     content_payload = []
@@ -1052,26 +1058,43 @@ def get_structured_adjustments(subject_property, comps_df, subject_property_sour
     comp_info_list = [format_property_info(row) for _, row in comps_df.iterrows()]
 
     # Compose prompt for OpenAI
-    system_prompt = "You are a helpful assistant. Only output valid JSON. Do not include any explanation or markdown."
+    system_prompt = (
+        "You are a senior real estate underwriter with MAI certification and 20+ years of commercial and residential valuation experience. "
+        "You specialize in comparative market analysis and property adjustments. "
+        "Provide professional underwriting analysis in strict JSON format only. No explanations or markdown."
+    )
     if subject_property_source == "api":
         subject_context = "The subject property information below was retrieved from a trusted real estate API and should be considered the ground truth for comparison."
     else:
         subject_context = "The subject property information below was entered manually by the user."
     
     user_prompt = (
-        f"You are a real estate underwriting assistant. {subject_context} "
-        "Given the subject property and a list of comparable properties, "
-        "provide for each comp: (1) an integer adjustment (positive or negative, in dollars), (2) a short explanation string, "
-        "and (3) a float weight (0-1, higher means more relevant). "
-        "IMPORTANT: Adjustments should be made relative to the subject property. "
-        "If a comp is nicer/better than the subject (better condition, more beds/baths, etc.), use a NEGATIVE adjustment to bring the comp's value DOWN. "
-        "If a comp is worse than the subject (poorer condition, fewer beds/baths, etc.), use a POSITIVE adjustment to bring the comp's value UP. "
-        "Do NOT apply adjustments for square footage, as this is already handled by a non-linear regression. "
-        "Only adjust for features NOT already accounted for by the regression, such as bed/bath count, condition, or other qualitative factors. "
-        "Also provide a specific summary explanation of how these particular comps influenced the ARV calculation for this subject property. "
-        "Explain which comps had the most impact and why, based on their adjustments and weights. "
-        "Return a JSON object with two keys: 'adjustments' (mapping each comp's address to a dict with keys 'adjustment', 'explanation', and 'weight') and 'arv_summary' (a string explaining how these specific comps influenced the ARV calculation).\n\n"
-        f"Subject Property:\n{subject_info_str}\n\nComps:\n" + "\n".join(comp_info_list)
+        f"UNDERWRITING ASSIGNMENT: Comparative Market Analysis\n"
+        f"{subject_context}\n\n"
+        "INSTRUCTIONS:\n"
+        "Analyze each comparable property relative to the subject and provide:\n"
+        "1. ADJUSTMENT (integer, in dollars): Net adjustment to comp's sale price\n"
+        "2. EXPLANATION (string): Professional justification for adjustment\n"
+        "3. WEIGHT (float, 0-1): Reliability/relevance weight for this comp\n\n"
+        "ADJUSTMENT METHODOLOGY:\n"
+        "• NEGATIVE adjustment: Comp is superior to subject (reduce comp's value to match subject)\n"
+        "• POSITIVE adjustment: Comp is inferior to subject (increase comp's value to match subject)\n"
+        "• DO NOT adjust for square footage (handled by regression model)\n"
+        "• Focus on: bed/bath count, condition, quality, age/updates, lot characteristics\n\n"
+        "CONDITION & QUALITY ANALYSIS:\n"
+        "• When Image Descriptions are available, use them to assess condition and finish quality differences\n"
+        "• Consider: exterior maintenance, architectural details, visible updates, overall property presentation\n"
+        "• Weight image-based insights at 20-30% of total adjustment (not the primary factor)\n"
+        "• Primary factors remain: bed/bath count, age, lot size, location proximity\n"
+        "• When 'No valid images provided', rely on quantitative factors only\n\n"
+        "WEIGHTING CRITERIA:\n"
+        "• Higher weight: Recent sales, closer distance, similar bed/bath/age, better condition data\n"
+        "• Lower weight: Older sales, distant location, significant size differences, missing information\n\n"
+        "OUTPUT REQUIREMENTS:\n"
+        "Return JSON with keys: 'adjustments' (comp address -> {adjustment, explanation, weight}) and 'arv_summary' (methodology explanation)\n\n"
+        "PROPERTY DATA:\n"
+        f"Subject Property:\n{subject_info_str}\n\n"
+        f"Comparable Properties:\n" + "\n".join([f"{i+1}. {comp}" for i, comp in enumerate(comp_info_list)])
     )
 
     if OPENAI_API_KEY == "" or not OPENAI_API_KEY:
