@@ -256,11 +256,11 @@ class RestDatabaseClient:
             target_found = False
             for prop in unique_properties:
                 if '4870' in str(prop.get('street_address', '')) and '39th' in str(prop.get('street_address', '')):
-                    print(f"DEBUG SMART SEARCH: ✓ Found target property: {prop['street_address']}")
+                    print(f"DEBUG SMART SEARCH: Found target property: {prop['street_address']}")
                     target_found = True
                     break
             if not target_found:
-                print(f"DEBUG SMART SEARCH: ❌ Target property '4870 NE 39th Street' still not found")
+                print(f"DEBUG SMART SEARCH: Target property '4870 NE 39th Street' still not found")
             
             if not unique_properties:
                 return pd.DataFrame()
@@ -295,11 +295,11 @@ class RestDatabaseClient:
                 target_in_final = False
                 for _, row in df.iterrows():
                     if '4870' in str(row.get('streetAddress', '')) and '39th' in str(row.get('streetAddress', '')):
-                        print(f"DEBUG SMART SEARCH: ✓ Target property in final results: {row['streetAddress']} at {row['distance_miles']:.3f} miles")
+                        print(f"DEBUG SMART SEARCH: Target property in final results: {row['streetAddress']} at {row['distance_miles']:.3f} miles")
                         target_in_final = True
                         break
                 if not target_in_final:
-                    print(f"DEBUG SMART SEARCH: ❌ Target property not in final results after radius filter")
+                    print(f"DEBUG SMART SEARCH: Target property not in final results after radius filter")
             
             return df
             
@@ -354,32 +354,48 @@ class RestDatabaseClient:
                 df['image_urls'] = pd.Series([[] for _ in range(len(df))], dtype=object)
                 return df
             
-            # Query images for all properties
-            # Use comma-separated list for the IN query
-            ids_str = ','.join(map(str, property_ids))
-            url = f"{self.url}/rest/v1/property_images?select=property_id,image_url,image_type&property_id=in.({ids_str})"
+            print(f"DEBUG: Loading images for {len(property_ids)} properties")
             
-            response = requests.get(url, headers=self.headers)
+            # Use batch processing for large datasets to avoid URL length limits
+            batch_size = 500  # Process 500 properties at a time
+            all_images_data = []
             
-            if response.status_code == 200:
-                images_data = response.json()
+            for i in range(0, len(property_ids), batch_size):
+                batch_ids = property_ids[i:i + batch_size]
+                ids_str = ','.join(map(str, batch_ids))
+                url = f"{self.url}/rest/v1/property_images?select=property_id,image_url,image_type&property_id=in.({ids_str})"
                 
-                # Group images by property_id
-                property_images = {}
-                for img in images_data:
-                    prop_id = img['property_id']
-                    if prop_id not in property_images:
-                        property_images[prop_id] = []
-                    property_images[prop_id].append(img['image_url'])
+                print(f"DEBUG: Querying batch {i//batch_size + 1} of {(len(property_ids) + batch_size - 1) // batch_size} ({len(batch_ids)} properties)")
                 
-                # Add image_urls column to dataframe
-                df['image_urls'] = df['id'].apply(lambda pid: property_images.get(pid, []))
-            else:
-                # If image query fails, add empty lists
-                df['image_urls'] = pd.Series([[] for _ in range(len(df))], dtype=object)
+                response = requests.get(url, headers=self.headers, timeout=30)
+                
+                if response.status_code == 200:
+                    batch_images = response.json()
+                    all_images_data.extend(batch_images)
+                    print(f"DEBUG: Batch {i//batch_size + 1} returned {len(batch_images)} images")
+                else:
+                    print(f"WARNING: Batch {i//batch_size + 1} failed with status {response.status_code}")
+            
+            print(f"DEBUG: Total images found: {len(all_images_data)}")
+            
+            # Group images by property_id
+            property_images = {}
+            for img in all_images_data:
+                prop_id = img['property_id']
+                if prop_id not in property_images:
+                    property_images[prop_id] = []
+                property_images[prop_id].append(img['image_url'])
+            
+            # Add image_urls column to dataframe
+            df['image_urls'] = df['id'].apply(lambda pid: property_images.get(pid, []))
+            
+            # Count final results
+            properties_with_images = sum(1 for images in property_images.values() if images)
+            print(f"DEBUG: Final result: {properties_with_images} properties have images")
                 
         except Exception as e:
             # If anything fails, add empty image lists
+            print(f"WARNING: Image loading failed: {str(e)}")
             df['image_urls'] = pd.Series([[] for _ in range(len(df))], dtype=object)
         
         return df
